@@ -80,9 +80,9 @@ class ItemDataSource extends DataTableSource {
       onSelectChanged: (selected) {
         // Optional: Add any onSelect behavior
       },
-      color: MaterialStateProperty.resolveWith<Color?>(
-            (Set<MaterialState> states) {
-          if (states.contains(MaterialState.hovered)) {
+      color: WidgetStateProperty.resolveWith<Color?>(
+            (Set<WidgetState> states) {
+          if (states.contains(WidgetState.hovered)) {
             return Colors.blue.withOpacity(0.1);
           }
           return isLowStock ? Colors.red.withOpacity(0.2) : null;
@@ -210,7 +210,7 @@ class _ItemsPageState extends State<ItemsPage> {
                       children: [
                         Text('Items', style: AppTheme.headline6),
                         Spacer(),
-                        Container(
+                        SizedBox(
                           width: MediaQuery.of(context).size.width * 0.15,
                           child: TextField(
                             onChanged: _onSearch,
@@ -229,8 +229,8 @@ class _ItemsPageState extends State<ItemsPage> {
                         ),
                       ],
                     ),
-                    headingRowColor: MaterialStateProperty.resolveWith<Color?>(
-                          (Set<MaterialState> states) {
+                    headingRowColor: WidgetStateProperty.resolveWith<Color?>(
+                          (Set<WidgetState> states) {
                         return Colors.blue.withOpacity(0.2);
                       },
                     ),

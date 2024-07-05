@@ -68,7 +68,7 @@ class AppTheme {
       colorScheme: ColorScheme.fromSwatch().copyWith(
         secondary: secondaryColor,
         error: errorColor,
-        background: backgroundColor,
+        surface: backgroundColor,
       ),
       scaffoldBackgroundColor: backgroundColor,
       elevatedButtonTheme: ElevatedButtonThemeData(style: elevatedButtonStyle),

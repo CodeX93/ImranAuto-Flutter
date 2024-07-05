@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:namer_app/services/auth.dart';
 import 'package:namer_app/theme/theme.dart';
-import 'package:namer_app/screens/item_management.dart';
-import 'package:namer_app/screens/login.dart';
 
 class BasePage extends StatelessWidget {
   final Widget child;
@@ -61,6 +59,13 @@ class NavigationDrawer extends StatelessWidget {
               title: Text('Customers'),
               onTap: () {
                 Navigator.pushReplacementNamed(context, '/customers');
+              }
+          ),
+          ListTile(
+              leading: Icon(Icons.admin_panel_settings),
+              title: Text('Users'),
+              onTap: () {
+                Navigator.pushReplacementNamed(context, '/users');
               }
           ),
           ListTile(

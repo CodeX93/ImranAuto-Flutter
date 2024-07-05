@@ -51,9 +51,9 @@ class CustomerDataSource extends DataTableSource {
       onSelectChanged: (selected) {
         // Optional: Add any onSelect behavior
       },
-      color: MaterialStateProperty.resolveWith<Color?>(
-            (Set<MaterialState> states) {
-          if (states.contains(MaterialState.hovered)) {
+      color: WidgetStateProperty.resolveWith<Color?>(
+            (Set<WidgetState> states) {
+          if (states.contains(WidgetState.hovered)) {
             return Colors.blue.withOpacity(0.1);
           }
           return null;
@@ -145,7 +145,7 @@ class _CustomerPageState extends State<CustomerPage> {
                 children: [
                   Text('Customer List', style: AppTheme.headline6),
                   Spacer(),
-                  Container(
+                  SizedBox(
                     width: MediaQuery.of(context).size.width * 0.15,
                     child: TextField(
                       controller: _searchController,
@@ -165,8 +165,8 @@ class _CustomerPageState extends State<CustomerPage> {
                   ),
                 ],
               ),
-              headingRowColor: MaterialStateProperty.resolveWith<Color?>(
-                    (Set<MaterialState> states) {
+              headingRowColor: WidgetStateProperty.resolveWith<Color?>(
+                    (Set<WidgetState> states) {
                   return Colors.blue.withOpacity(0.2);
                 },
               ),

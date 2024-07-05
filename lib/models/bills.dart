@@ -44,7 +44,7 @@ class BillItem {
   double total;
   String name;
   double purchaseRate;
-
+  String? customerName;
 
   BillItem({
     required this.itemId,
@@ -52,17 +52,19 @@ class BillItem {
     required this.saleRate,
     required this.total,
     required this.name,
-    required this.purchaseRate
+    required this.purchaseRate,
+    this.customerName
   });
 
   factory BillItem.fromJson(Map<String, dynamic> json) {
     return BillItem(
-      itemId: json['item'],
-      quantity: json['quantity'],
-      saleRate: json['saleRate'].toDouble(),
-      total: json['total'].toDouble(),
-      name: json['name'],
-      purchaseRate: json['purchaseRate'].toDouble()
+      itemId: json['itemId'] ?? '',
+      name: json['name'] ?? '',
+      quantity: json['quantity'] ?? 0,
+      saleRate: (json['saleRate'] ?? 0).toDouble(),
+      purchaseRate: (json['purchaseRate'] ?? 0).toDouble(),
+      total: (json['total'] ?? 0).toDouble(),
+      customerName: json['customerName'] ?? '',
     );
   }
 
@@ -73,7 +75,8 @@ class BillItem {
       'saleRate': saleRate,
       'total': total,
       'name': name,
-      'purchaseRate': purchaseRate
+      'purchaseRate': purchaseRate,
+      'customerName': customerName
     };
   }
 }

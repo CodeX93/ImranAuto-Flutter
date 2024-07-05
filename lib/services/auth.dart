@@ -13,13 +13,14 @@ class AuthService {
     );
 
     if (response.statusCode == 200) {
-      // Handle successful login
-      // You might want to save the token or user data here
-      // get token from header
       final token = response.headers['authorization'];
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('token', token!);
       print(response.body);
+      final Map<String, dynamic> responseBody = json.decode(response.body);
+      final role = responseBody['role'];
+
+      await prefs.setString('role', role);
       return true;
     } else {
       // Handle login failure

@@ -17,6 +17,19 @@ class BillService {
     }
   }
 
+  void reduceItemsQuantity(List<BillItem> items) async {
+    for (var item in items) {
+      final response = await http.put(
+        Uri.parse('$apiUrl/items/${item.itemId}/quantity'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'quantity': item.quantity}),
+      );
+      if (response.statusCode != 200) {
+        throw Exception('Failed to reduce item quantity');
+      }
+    }
+  }
+
   Future<void> addBill(Bill bill) async {
     final response = await http.post(
       Uri.parse('$apiUrl/bills'),
@@ -85,5 +98,27 @@ class BillService {
       throw Exception('Failed to update customer balance');
     }
   }
-}
 
+  Future<List<Bill>> getBillsByCustomerId(String customerId) async {
+    final response = await http.get(Uri.parse('$apiUrl/customers/$customerId/bills'));
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      return data.map((bill) => Bill.fromJson(bill)).toList();
+    } else {
+      print(response.body);
+      print(response.statusCode);
+      throw Exception('Failed to load bills for customer');
+    }
+  }
+
+  Future<List<BillItem>> getItemRatesById(String itemId) async {
+    final response = await http.get(Uri.parse('$apiUrl/items/$itemId/rates'));
+    if (response.statusCode == 200) {
+      List<dynamic> data = json.decode(response.body);
+      print(data);
+      return data.map((item) => BillItem.fromJson(item)).toList();
+    } else {
+      throw Exception('Failed to load item rates');
+    }
+  }
+}
