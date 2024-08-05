@@ -9,6 +9,118 @@ import 'package:namer_app/theme/theme.dart';
 import 'package:namer_app/components/input_field.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'item_selection_dialog.dart';
+
+
+class BillsDataSource extends DataTableSource {
+  final List<Bill> bills;
+  final Map<String, Customer> customers;
+  final void Function(Bill) onEdit;
+  final void Function(String) onDelete;
+  final void Function(Bill) toggleStatus;
+  final void Function(Bill) showBillItems;
+  final BuildContext context;
+  List<Bill> filteredBills;
+
+  BillsDataSource({
+    required this.bills,
+    required this.customers,
+    required this.onEdit,
+    required this.onDelete,
+    required this.toggleStatus,
+    required this.showBillItems,
+    required this.context,
+  }) : filteredBills = List.from(bills);
+
+  void filterBills(String query) {
+    final lowerQuery = query.toLowerCase();
+    filteredBills
+      ..clear()
+      ..addAll(bills.where((bill) {
+        final customer = customers[bill.customerId];
+        final customerName = customer?.name.toLowerCase() ?? '';
+        final itemNames = bill.items.map((item) => item.name.toLowerCase()).join(' ');
+        final totalAmount = bill.totalAmount.toString();
+        return customerName.contains(lowerQuery) ||
+            itemNames.contains(lowerQuery) ||
+            totalAmount.contains(lowerQuery);
+      }));
+    notifyListeners();
+  }
+
+  void sortBills<T>(Comparable<T> Function(Bill bill) getField, bool ascending) {
+    filteredBills.sort((a, b) {
+      if (!ascending) {
+        final Bill c = a;
+        a = b;
+        b = c;
+      }
+      final Comparable<T> aValue = getField(a);
+      final Comparable<T> bValue = getField(b);
+      return Comparable.compare(aValue, bValue);
+    });
+    notifyListeners();
+  }
+
+  @override
+  DataRow? getRow(int index) {
+    final bill = filteredBills[index];
+    final customer = customers[bill.customerId];
+    final formattedDate = DateFormat('dd-MM-yyyy').format(DateTime.parse(bill.date));
+    return DataRow.byIndex(
+      index: index,
+      cells: [
+        DataCell(Text((index + 1).toString())),
+        DataCell(Text(bill.id)),
+        DataCell(Text(customer != null ? customer.name : '')),
+        DataCell(Text('\$${bill.totalAmount.toStringAsFixed(2)}')),
+        DataCell(
+          GestureDetector(
+            onTap: () => toggleStatus(bill),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: bill.status == 'Completed' ? Colors.green : Colors.red,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                bill.status,
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+        ),
+        DataCell(Text(formattedDate)),
+        DataCell(Row(
+          children: [
+            IconButton(
+              icon: Icon(Icons.edit, color: Colors.blue),
+              onPressed: () => onEdit(bill),
+            ),
+            IconButton(
+              icon: Icon(Icons.delete, color: Colors.red),
+              onPressed: () => onDelete(bill.id),
+            ),
+            IconButton(
+              icon: Icon(Icons.list, color: Colors.green),
+              onPressed: () => showBillItems(bill),
+            ),
+          ],
+        )),
+      ],
+    );
+  }
+
+  @override
+  int get rowCount => filteredBills.length;
+
+  @override
+  bool get isRowCountApproximate => false;
+
+  @override
+  int get selectedRowCount => 0;
+}
+
 class BillsPage extends StatefulWidget {
   @override
   _BillsPageState createState() => _BillsPageState();
@@ -17,9 +129,14 @@ class BillsPage extends StatefulWidget {
 class _BillsPageState extends State<BillsPage> {
   final BillService _billService = BillService();
   List<Bill> _bills = [];
+  BillsDataSource? _dataSource;
   bool _isLoading = true;
   Map<String, Customer> _customers = {};
   String? _role;
+  bool _sortAscending = true;
+  int _sortColumnIndex = 0;
+  final TextEditingController _searchController = TextEditingController();
+  int _rowsPerPage = PaginatedDataTable.defaultRowsPerPage;
 
   @override
   void initState() {
@@ -43,11 +160,20 @@ class _BillsPageState extends State<BillsPage> {
     }
     setState(() {
       _bills = bills;
+      _dataSource = BillsDataSource(
+        bills: _bills,
+        customers: _customers,
+        onEdit: _showAddEditBillDialog,
+        onDelete: _deleteBill,
+        toggleStatus: _toggleStatus,
+        showBillItems: _showBillItems,
+        context: context,
+      );
       _isLoading = false;
     });
   }
 
-  void _showAddEditBillDialog({Bill? bill}) {
+  void _showAddEditBillDialog([Bill? bill]) {
     showDialog(
       context: context,
       builder: (context) => AddEditBillDialog(
@@ -107,81 +233,110 @@ class _BillsPageState extends State<BillsPage> {
     }
   }
 
+  void _onSearch(String query) {
+    setState(() {
+      _dataSource?.filterBills(query);
+    });
+  }
+
+  void _onSort<T>(Comparable<T> Function(Bill bill) getField, int columnIndex, bool ascending) {
+    setState(() {
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+      _dataSource?.sortBills(getField, ascending);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[200],
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: AppTheme.inputDecoration('Search bills...'),
-              onChanged: (value) {
-                // Implement search logic here
-              },
+          : SingleChildScrollView(
+        child: Center(
+          child: Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            margin: EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [BoxShadow(color: Colors.grey, blurRadius: 5)],
+              color: Colors.white,
             ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              child: DataTable(
-                columns: [
-                  DataColumn(label: Text('Bill ID')),
-                  DataColumn(label: Text('Customer Name')),
-                  DataColumn(label: Text('Total Amount')),
-                  DataColumn(label: Text('Status')),
-                  DataColumn(label: Text('Date')),
-                  DataColumn(label: Text('Actions')),
-                ],
-                rows: _bills.map((bill) {
-                  final customer = _customers[bill.customerId];
-                  final formattedDate = DateFormat('dd-MM-yyyy').format(DateTime.parse(bill.date));
-                  return DataRow(
-                    cells: [
-                      DataCell(Text(bill.id)),
-                      DataCell(Text(customer != null ? customer.name : '')),
-                      DataCell(Text('\$${bill.totalAmount.toStringAsFixed(2)}')),
-                      DataCell(
-                        GestureDetector(
-                          onTap: () => _toggleStatus(bill),
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: bill.status == 'Completed' ? Colors.green : Colors.red,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              bill.status,
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
+            child: PaginatedDataTable(
+              header: Row(
+                children: [
+                  Text('Bills List', style: AppTheme.headline6),
+                  Spacer(),
+                  SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.15,
+                    child: TextField(
+                      controller: _searchController,
+                      onChanged: _onSearch,
+                      decoration: InputDecoration(
+                        labelText: 'Search',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      DataCell(Text(formattedDate)),
-                      DataCell(Row(
-                        children: [
-                          IconButton(
-                            icon: Icon(Icons.edit, color: Colors.blue),
-                            onPressed: () => _showAddEditBillDialog(bill: bill),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.delete, color: Colors.red),
-                            onPressed: () => _deleteBill(bill.id),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.list, color: Colors.green),
-                            onPressed: () => _showBillItems(bill),
-                          ),
-                        ],
-                      )),
-                    ],
-                  );
-                }).toList(),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.refresh),
+                    onPressed: _fetchBills,
+                  ),
+                ],
               ),
+              headingRowColor: MaterialStateProperty.resolveWith<Color?>(
+                    (Set<MaterialState> states) {
+                  return Colors.blue.withOpacity(0.2);
+                },
+              ),
+              columns: [
+                DataColumn(
+                  label: Text('S.No'),
+                  onSort: (columnIndex, ascending) => _onSort<num>((bill) => _dataSource!.filteredBills.indexOf(bill) + 1, columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Bill ID'),
+                  onSort: (columnIndex, ascending) => _onSort<String>((bill) => bill.id, columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Customer Name'),
+                  onSort: (columnIndex, ascending) => _onSort<String>((bill) => _customers[bill.customerId]?.name ?? '', columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Total Amount'),
+                  onSort: (columnIndex, ascending) => _onSort<num>((bill) => bill.totalAmount, columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Status'),
+                  onSort: (columnIndex, ascending) => _onSort<String>((bill) => bill.status, columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Date'),
+                  onSort: (columnIndex, ascending) => _onSort<DateTime>((bill) => DateTime.parse(bill.date), columnIndex, ascending),
+                ),
+                DataColumn(label: Text('Actions')),
+              ],
+              source: _dataSource!,
+              rowsPerPage: _rowsPerPage,
+              onRowsPerPageChanged: (value) {
+                setState(() {
+                  _rowsPerPage = value!;
+                });
+              },
+              availableRowsPerPage: [5, 10, 20, 30],
+              columnSpacing: 20,
+              horizontalMargin: 20,
+              showCheckboxColumn: false,
+              sortColumnIndex: _sortColumnIndex,
+              sortAscending: _sortAscending,
             ),
           ),
-        ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddEditBillDialog(),
@@ -206,7 +361,6 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
   final TextEditingController _totalAmountController = TextEditingController();
   final TextEditingController _balanceController = TextEditingController();
   final TextEditingController _customerController = TextEditingController();
-  final TextEditingController _itemController = TextEditingController();
   final BillService _billService = BillService();
   bool _isLoading = false;
 
@@ -235,6 +389,9 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
       _selectedStatus = widget.bill!.status;
       _calculateTotalAmount();
       _fetchCustomerDetails();
+      for (var item in _selectedItems) {
+        _fetchItemPreviousRates(item.itemId);
+      }
     }
   }
 
@@ -282,14 +439,29 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
     if (item.availableQuantity > 0) {
       await _fetchItemPreviousRates(item.id);
       setState(() {
-        _selectedItems.add(BillItem(
-          itemId: item.id,
-          name: item.name,
-          quantity: 1,
-          saleRate: item.saleRate,
-          purchaseRate: item.purchaseRate,
-          total: item.saleRate,
-        ));
+        // Check if the item already exists in the selected items
+        BillItem? existingItem;
+        for (var selectedItem in _selectedItems) {
+          if (selectedItem.itemId == item.id) {
+            existingItem = selectedItem;
+            break;
+          }
+        }
+
+        if (existingItem != null) {
+          existingItem.quantity++;
+          existingItem.total = existingItem.saleRate * existingItem.quantity;
+        } else {
+          _selectedItems.add(BillItem(
+            itemId: item.id,
+            name: item.name,
+            quantity: 1,
+            saleRate: item.saleRate,
+            purchaseRate: item.purchaseRate,
+            total: item.saleRate,
+          ));
+        }
+
         _calculateTotalAmount();
       });
     } else {
@@ -345,7 +517,6 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
     });
 
     final date = _dateController.text;
-
     if (widget.bill == null) {
       await _billService.addBill(Bill(
         id: '',
@@ -376,6 +547,21 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
     Navigator.pop(context);
   }
 
+  void _showItemSelectionDialog() async {
+    final items = await _billService.getItems(); // Fetch items from your service
+    showDialog(
+      context: context,
+      builder: (context) => ItemSelectionDialog(
+        items: items,
+        onItemsSelected: (selectedItems) {
+          for (var item in selectedItems) {
+            _addItemToBill(item);
+          }
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Dialog(
@@ -391,7 +577,18 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(widget.bill == null ? 'Add Bill' : 'Edit Bill', style: AppTheme.headline6),
+              Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.blue,
+                  ),
+                  alignment: Alignment.center,
+                  width: double.infinity,
+                  child: Text(widget.bill == null ? 'Add Bill' : 'Edit Bill', style: TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ))),
               SizedBox(height: 16),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -440,52 +637,37 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
                           label: 'Balance',
                         ),
                         SizedBox(height: 16),
-                        TextField(
-                          controller: _dateController,
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(),
-                            labelText: 'Date',
-                          ),
-                          readOnly: true,
-                          onTap: () async {
-                            DateTime? pickedDate = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2101),
-                            );
-
-                            if (pickedDate != null) {
-                              setState(() {
-                                _dateController.text = DateFormat('dd-MM-yyyy').format(pickedDate);
-                              });
-                            }
-                          },
-                        ),
-                        SizedBox(height: 16),
-                        TypeAheadFormField<Item>(
-                          textFieldConfiguration: TextFieldConfiguration(
-                            controller: _itemController,
+                        SizedBox(
+                          width: 400,
+                          child: TextField(
+                            controller: _dateController,
                             decoration: InputDecoration(
                               border: OutlineInputBorder(),
-                              labelText: 'Items',
+                              labelText: 'Date',
                             ),
+                            readOnly: true,
+                            onTap: () async {
+                              DateTime? pickedDate = await showDatePicker(
+                                context: context,
+                                initialDate: DateTime.now(),
+                                firstDate: DateTime(2000),
+                                lastDate: DateTime(2101),
+                              );
+
+                              if (pickedDate != null) {
+                                setState(() {
+                                  _dateController.text = DateFormat('dd-MM-yyyy').format(pickedDate);
+                                });
+                              }
+                            },
                           ),
-                          suggestionsCallback: (pattern) {
-                            return _items.where((item) => item.name.toLowerCase().contains(pattern.toLowerCase()));
-                          },
-                          itemBuilder: (context, Item suggestion) {
-                            return ListTile(
-                              title: Text(suggestion.name),
-                            );
-                          },
-                          onSuggestionSelected: (Item suggestion) {
-                            _addItemToBill(suggestion);
-                            _itemController.clear();
-                          },
-                          noItemsFoundBuilder: (context) => Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text('No items found.'),
+                        ),
+                        SizedBox(height: 16),
+                        SizedBox(
+                          width: 400,
+                          child: ElevatedButton(
+                            onPressed: _showItemSelectionDialog,
+                            child: Text('Add Item'),
                           ),
                         ),
                         SizedBox(height: 16),
@@ -504,23 +686,6 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
                                       ),
                                     ],
                                   ),
-                                  if (_itemPreviousRates.containsKey(item.itemId)) ...[
-                                    SizedBox(height: 8),
-                                    Text(
-                                      'Previous Rates:',
-                                      style: TextStyle(fontWeight: FontWeight.bold),
-                                    ),
-                                    for (var rate in _itemPreviousRates[item.itemId]!.take(5)) ...[
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text('Customer: ${rate.customerName}'),
-                                          Text('Sale: \$${rate.saleRate.toStringAsFixed(2)}'),
-                                          Text('Purchase: \$${rate.purchaseRate.toStringAsFixed(2)}'),
-                                        ],
-                                      ),
-                                    ],
-                                  ],
                                   SizedBox(height: 15),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -596,29 +761,32 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
                           readOnly: true,
                         ),
                         SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
-                          value: _selectedStatus,
-                          hint: Text('Select Status'),
-                          onChanged: (value) {
-                            if (_role == 'admin') {
-                              setState(() {
-                                _selectedStatus = value!;
-                              });
-                            }else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('You are not authorized to change the status')),
+                        SizedBox(
+                          width: 400,
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedStatus,
+                            hint: Text('Select Status'),
+                            onChanged: (value) {
+                              if (_role == 'admin') {
+                                setState(() {
+                                  _selectedStatus = value!;
+                                });
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('You are not authorized to change the status')),
+                                );
+                              }
+                            },
+                            items: ['Completed', 'Non Completed'].map((status) {
+                              return DropdownMenuItem(
+                                value: status,
+                                child: Text(status),
                               );
-                            }
-                          },
-                          items: ['Completed', 'Non Completed'].map((status) {
-                            return DropdownMenuItem(
-                              value: status,
-                              child: Text(status),
-                            );
-                          }).toList(),
-                          decoration: InputDecoration(
-                            border: OutlineInputBorder(),
-                            labelText: 'Status',
+                            }).toList(),
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(),
+                              labelText: 'Status',
+                            ),
                           ),
                         ),
                         SizedBox(height: 16),
@@ -635,56 +803,99 @@ class _AddEditBillDialogState extends State<AddEditBillDialog> {
                   SizedBox(width: 16),
                   if (_selectedCustomer != null) ...[
                     Expanded(
-                      child: Card(
-                        margin: EdgeInsets.all(8.0),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Customer Details', style: AppTheme.headline6),
-                              SizedBox(height: 8),
-                              Table(
-                                children: [
-                                  TableRow(children: [
-                                    Text('Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    Text('Phone', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    Text('Address', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    Text('Tour', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    Text('Balance', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ]),
-                                  TableRow(children: [
-                                    Text(_selectedCustomer!.name),
-                                    Text(_selectedCustomer!.phoneNumber),
-                                    Text(_selectedCustomer!.address),
-                                    Text(_selectedCustomer!.tour),
-                                    Text('\$${_selectedCustomer!.balance.toStringAsFixed(2)}'),
-                                  ]),
-                                ],
-                              ),
-                              if (_previousBills.isNotEmpty) ...[
-                                SizedBox(height: 16),
-                                Text('Previous Bills', style: AppTheme.headline6),
-                                SizedBox(height: 8),
-                                Table(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20),
+                          color: Colors.blue[400],
+                        ),
+                        child: Column(
+                          children: [
+                            Card(
+                              margin: EdgeInsets.all(8.0),
+                              child: Padding(
+                                padding: const EdgeInsets.all(16.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    TableRow(children: [
-                                      Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      Text('Total Amount', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
-                                    ]),
-                                    for (var bill in _previousBills) ...[
-                                      TableRow(children: [
-                                        Text(DateFormat('dd-MM-yyyy').format(DateTime.parse(bill.date))),
-                                        Text('\$${bill.totalAmount.toStringAsFixed(2)}'),
-                                        Text(bill.status),
-                                      ]),
+                                    Text('Customer Details', style: AppTheme.headline6),
+                                    SizedBox(height: 8),
+                                    Table(
+                                      children: [
+                                        TableRow(children: [
+                                          Text('Name', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          Text('Phone', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          Text('Address', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          Text('Tour', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          Text('Balance', style: TextStyle(fontWeight: FontWeight.bold)),
+                                        ]),
+                                        TableRow(children: [
+                                          Text(_selectedCustomer!.name),
+                                          Text(_selectedCustomer!.phoneNumber),
+                                          Text(_selectedCustomer!.address),
+                                          Text(_selectedCustomer!.tour),
+                                          Text('\$${_selectedCustomer!.balance.toStringAsFixed(2)}'),
+                                        ]),
+                                      ],
+                                    ),
+                                    if (_previousBills.isNotEmpty) ...[
+                                      SizedBox(height: 16),
+                                      Text('Previous Bills', style: AppTheme.headline6),
+                                      SizedBox(height: 8),
+                                      Table(
+                                        children: [
+                                          TableRow(children: [
+                                            Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            Text('Total Amount', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
+                                          ]),
+                                          for (var bill in _previousBills) ...[
+                                            TableRow(children: [
+                                              Text(DateFormat('dd-MM-yyyy').format(DateTime.parse(bill.date))),
+                                              Text('\$${bill.totalAmount.toStringAsFixed(2)}'),
+                                              Text(bill.status),
+                                            ]),
+                                          ],
+                                        ],
+                                      ),
                                     ],
                                   ],
                                 ),
-                              ],
-                            ],
-                          ),
+                              ),
+                            ),
+                            if (_selectedItems.isNotEmpty)
+                              for (var item in _selectedItems)
+                                Card(
+                                  margin: EdgeInsets.all(8.0),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(16.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(item.name, style: AppTheme.headline6),
+                                        SizedBox(height: 8),
+                                        Table(
+                                          children: [
+                                            TableRow(children: [
+                                              Text('Customer', style: TextStyle(fontWeight: FontWeight.bold)),
+                                              Text('Sales Rate', style: TextStyle(fontWeight: FontWeight.bold)),
+                                              Text('Purchase Rate', style: TextStyle(fontWeight: FontWeight.bold)),
+                                              Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            ]),
+                                            for (var rate in _itemPreviousRates[item.itemId]!.take(5)) ...[
+                                              TableRow(children: [
+                                                Text(rate.customerName ?? ''),
+                                                Text('\$${rate.saleRate.toStringAsFixed(2)}'),
+                                                Text('\$${rate.purchaseRate.toStringAsFixed(2)}'),
+                                                Text(rate.date ?? ''),
+                                              ]),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                          ],
                         ),
                       ),
                     ),

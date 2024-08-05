@@ -45,6 +45,7 @@ class BillItem {
   String name;
   double purchaseRate;
   String? customerName;
+  String? date;
 
   BillItem({
     required this.itemId,
@@ -53,24 +54,26 @@ class BillItem {
     required this.total,
     required this.name,
     required this.purchaseRate,
-    this.customerName
+    this.customerName,
+    this.date,
   });
 
   factory BillItem.fromJson(Map<String, dynamic> json) {
     return BillItem(
-      itemId: json['itemId'] ?? '',
+      itemId: json['itemId'] ?? json['item'] ?? '',
       name: json['name'] ?? '',
       quantity: json['quantity'] ?? 0,
       saleRate: (json['saleRate'] ?? 0).toDouble(),
       purchaseRate: (json['purchaseRate'] ?? 0).toDouble(),
       total: (json['total'] ?? 0).toDouble(),
       customerName: json['customerName'] ?? '',
+      date: json['date'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'item': itemId,
+      'itemId': itemId,
       'quantity': quantity,
       'saleRate': saleRate,
       'total': total,

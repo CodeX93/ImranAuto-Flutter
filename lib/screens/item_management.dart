@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:namer_app/models/item.dart';
 import 'package:namer_app/services/items.dart';
 import 'package:namer_app/theme/theme.dart';
 import 'package:namer_app/components/input_field.dart';
+import 'dart:io';
+import 'package:file_selector/file_selector.dart';
 
 class ItemDataSource extends DataTableSource {
   final List<Item> items;
@@ -59,7 +62,10 @@ class ItemDataSource extends DataTableSource {
         DataCell(Text(item.saleRate.toString())),
         DataCell(Text(item.minStock.toString())),
         DataCell(Text(item.location ?? '')),
-        DataCell(Text(item.picture ?? '')),
+        DataCell(SizedBox(
+            width: 50,
+            height: 50,
+            child: Image.network(item.picture != null?'${dotenv.env['BACKEND_URL']!}${item.picture}': ''))),
         DataCell(Row(
           children: [
             IconButton(
@@ -80,9 +86,9 @@ class ItemDataSource extends DataTableSource {
       onSelectChanged: (selected) {
         // Optional: Add any onSelect behavior
       },
-      color: WidgetStateProperty.resolveWith<Color?>(
-            (Set<WidgetState> states) {
-          if (states.contains(WidgetState.hovered)) {
+      color: MaterialStateProperty.resolveWith<Color?>(
+            (Set<MaterialState> states) {
+          if (states.contains(MaterialState.hovered)) {
             return Colors.blue.withOpacity(0.1);
           }
           return isLowStock ? Colors.red.withOpacity(0.2) : null;
@@ -194,108 +200,108 @@ class _ItemsPageState extends State<ItemsPage> {
           : SingleChildScrollView(
         child: Center(
 
-            child:
-                Container(
-                  width: MediaQuery.of(context).size.width * 0.9,
-                  margin: EdgeInsets.all(16),
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: Colors.white,
+          child:
+          Container(
+            width: MediaQuery.of(context).size.width * 0.9,
+            margin: EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: Colors.white,
 
-                  ),
-                  // width: double.infinity,
-                  child: PaginatedDataTable(
-                    header: Row(
-                      children: [
-                        Text('Items', style: AppTheme.headline6),
-                        Spacer(),
-                        SizedBox(
-                          width: MediaQuery.of(context).size.width * 0.15,
-                          child: TextField(
-                            onChanged: _onSearch,
-                            decoration: InputDecoration(
-                              labelText: 'Search',
-                              prefixIcon: Icon(Icons.search),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
-                          ),
+            ),
+            // width: double.infinity,
+            child: PaginatedDataTable(
+              header: Row(
+                children: [
+                  Text('Items', style: AppTheme.headline6),
+                  Spacer(),
+                  SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.15,
+                    child: TextField(
+                      onChanged: _onSearch,
+                      decoration: InputDecoration(
+                        labelText: 'Search',
+                        prefixIcon: Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        IconButton(
-                          icon: Icon(Icons.refresh),
-                          onPressed: _fetchItems,
-                        ),
-                      ],
+                      ),
                     ),
-                    headingRowColor: WidgetStateProperty.resolveWith<Color?>(
-                          (Set<WidgetState> states) {
-                        return Colors.blue.withOpacity(0.2);
-                      },
-                    ),
-                    columns: [
-                      DataColumn(
-                        label: Text('Name'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.name, columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Brand'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.brand, columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Quantity'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.availableQuantity, columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Name in Urdu'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.nameInUrdu ?? '', columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Mini Unit'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.miniUnit ?? '', columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Packaging'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.packaging ?? '', columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Purchase Rate'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.purchaseRate, columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Sale Rate'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.saleRate, columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Min Stock'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.minStock, columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Location'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.location ?? '', columnIndex, ascending),
-                      ),
-                      DataColumn(
-                        label: Text('Picture'),
-                        onSort: (columnIndex, ascending) => _onSort((item) => item.picture ?? '', columnIndex, ascending),
-                      ),
-                      DataColumn(label: Text('Actions')),
-                    ],
-                    source: _dataSource!,
-                    rowsPerPage: _rowsPerPage,
-                    onRowsPerPageChanged: (value) {
-                      setState(() {
-                        _rowsPerPage = value!;
-                      });
-                    },
-                    availableRowsPerPage: [5, 10, 20, 30],
-                    columnSpacing: 20,
-                    horizontalMargin: 20,
-                    showCheckboxColumn: false,
-                    sortColumnIndex: _sortColumnIndex,
-                    sortAscending: _sortAscending,
                   ),
+                  IconButton(
+                    icon: Icon(Icons.refresh),
+                    onPressed: _fetchItems,
+                  ),
+                ],
+              ),
+              headingRowColor: MaterialStateProperty.resolveWith<Color?>(
+                    (Set<MaterialState> states) {
+                  return Colors.blue.withOpacity(0.2);
+                },
+              ),
+              columns: [
+                DataColumn(
+                  label: Text('Name'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.name, columnIndex, ascending),
                 ),
+                DataColumn(
+                  label: Text('Brand'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.brand, columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Quantity'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.availableQuantity, columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Name in Urdu'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.nameInUrdu ?? '', columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Mini Unit'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.miniUnit ?? '', columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Packaging'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.packaging ?? '', columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Purchase Rate'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.purchaseRate, columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Sale Rate'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.saleRate, columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Min Stock'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.minStock, columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Location'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.location ?? '', columnIndex, ascending),
+                ),
+                DataColumn(
+                  label: Text('Picture'),
+                  onSort: (columnIndex, ascending) => _onSort((item) => item.picture ?? '', columnIndex, ascending),
+                ),
+                DataColumn(label: Text('Actions')),
+              ],
+              source: _dataSource!,
+              rowsPerPage: _rowsPerPage,
+              onRowsPerPageChanged: (value) {
+                setState(() {
+                  _rowsPerPage = value!;
+                });
+              },
+              availableRowsPerPage: [5, 10, 20, 30],
+              columnSpacing: 20,
+              horizontalMargin: 20,
+              showCheckboxColumn: false,
+              sortColumnIndex: _sortColumnIndex,
+              sortAscending: _sortAscending,
+            ),
+          ),
         ),
       ),
       floatingActionButton: FloatingActionButton(
@@ -327,9 +333,9 @@ class _AddEditItemDialogState extends State<AddEditItemDialog> {
   final TextEditingController _saleRateController = TextEditingController();
   final TextEditingController _minStockController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
-  final TextEditingController _pictureController = TextEditingController();
   final ItemService _itemService = ItemService();
   bool _isLoading = false;
+  File? _image;
 
   @override
   void initState() {
@@ -345,7 +351,23 @@ class _AddEditItemDialogState extends State<AddEditItemDialog> {
       _saleRateController.text = widget.item!.saleRate.toString();
       _minStockController.text = widget.item!.minStock.toString();
       _locationController.text = widget.item!.location!;
-      _pictureController.text = widget.item!.picture!;
+    }
+  }
+
+  Future<void> _pickImage() async {
+    try {
+      final typeGroup = XTypeGroup(
+        label: 'images',
+        extensions: <String>['jpg', 'png', 'jpeg'],
+      );
+      final file = await openFile(acceptedTypeGroups: [typeGroup]);
+      if (file != null) {
+        setState(() {
+          _image = File(file.path);
+        });
+      }
+    } catch (e) {
+      print('Error picking image: $e');
     }
   }
 
@@ -364,11 +386,15 @@ class _AddEditItemDialogState extends State<AddEditItemDialog> {
     final saleRate = double.tryParse(_saleRateController.text) ?? 0;
     final minStock = int.tryParse(_minStockController.text) ?? 0;
     final location = _locationController.text;
-    final picture = _pictureController.text;
+    String pictureUrl = widget.item?.picture ?? '';
+
+    if (_image != null) {
+      pictureUrl = await _itemService.uploadImage(_image!);
+    }
 
     if (widget.item == null) {
       await _itemService.addItem(Item(
-        id: '', // Placeholder, ID will be generated by backend
+        id: '',
         name: name,
         brand: brand,
         availableQuantity: quantity,
@@ -380,7 +406,7 @@ class _AddEditItemDialogState extends State<AddEditItemDialog> {
         minStock: minStock,
         addedEditDate: DateTime.now(),
         location: location,
-        picture: picture,
+        picture: pictureUrl,
       ));
     } else {
       await _itemService.updateItem(widget.item!.id, Item(
@@ -396,7 +422,7 @@ class _AddEditItemDialogState extends State<AddEditItemDialog> {
         minStock: minStock,
         addedEditDate: widget.item!.addedEditDate,
         location: location,
-        picture: picture,
+        picture: pictureUrl,
       ));
     }
 
@@ -478,9 +504,44 @@ class _AddEditItemDialogState extends State<AddEditItemDialog> {
                 label: 'Location',
               ),
               SizedBox(height: 16),
-              CustomTextField(
-                controller: _pictureController,
-                label: 'Picture URL',
+              widget.item?.picture != null && _image == null
+                  ? SizedBox(
+                width: 300,
+                height: 200,
+                child: Image.network('${dotenv.env['BACKEND_URL']!}${widget.item!.picture}'),
+              )
+                  : _image != null
+                  ? SizedBox(
+                width: 300,
+                height: 200,
+                child: Image.file(
+                  _image!,
+                  fit: BoxFit.cover,
+                ),
+              )
+                  : SizedBox(),
+              _image == null
+                  ? TextButton.icon(
+                icon: Icon(Icons.image),
+                label: Text('Pick Image'),
+                onPressed: _pickImage,
+              )
+                  : Column(
+                children: [
+                  SizedBox(
+                    width: 300,
+                    height: 200,
+                    child: Image.file(
+                      _image!,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  TextButton.icon(
+                    icon: Icon(Icons.image),
+                    label: Text('Change Image'),
+                    onPressed: _pickImage,
+                  ),
+                ],
               ),
               SizedBox(height: 16),
               _isLoading
@@ -539,3 +600,4 @@ class _AddStockDialogState extends State<AddStockDialog> {
     );
   }
 }
+

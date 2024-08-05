@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthService {
   Future<bool> login(String username, String password) async {
+    try{
     final url = Uri.parse('${dotenv.env['BACKEND_URL']!}/users/login');
     final response = await http.post(
       url,
@@ -16,7 +17,6 @@ class AuthService {
       final token = response.headers['authorization'];
       final SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('token', token!);
-      print(response.body);
       final Map<String, dynamic> responseBody = json.decode(response.body);
       final role = responseBody['role'];
 
@@ -24,6 +24,9 @@ class AuthService {
       return true;
     } else {
       // Handle login failure
+      return false;
+    }
+    } catch (e) {
       return false;
     }
   }

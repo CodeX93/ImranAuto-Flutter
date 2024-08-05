@@ -4,6 +4,8 @@ import 'package:namer_app/models/item.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 class BillService {
   final String apiUrl = 'http://localhost:3000';
 
@@ -42,12 +44,16 @@ class BillService {
   }
 
   Future<void> updateBill(String id, Bill bill) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
     final response = await http.put(
       Uri.parse('$apiUrl/bills/$id'),
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json',
+        'Authorization': '${prefs.get('token')}'
+      },
       body: json.encode(bill.toJson()),
     );
     if (response.statusCode != 200) {
+      print('error ${response.body}');
       throw Exception('Failed to update bill');
     }
   }
@@ -116,7 +122,7 @@ class BillService {
     if (response.statusCode == 200) {
       List<dynamic> data = json.decode(response.body);
       print(data);
-      return data.map((item) => BillItem.fromJson(item)).toList();
+      return data.map((item) => BillItem.fromJson(item)).toList().reversed.toList();
     } else {
       throw Exception('Failed to load item rates');
     }

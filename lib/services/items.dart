@@ -1,16 +1,16 @@
-import 'dart:convert';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:namer_app/models/item.dart';
 
 class ItemService {
-  final String baseUrl = '${dotenv.env['BACKEND_URL']!}/items';
+  final String _baseUrl = 'http://localhost:3000';
 
   Future<List<Item>> getItems() async {
-    final response = await http.get(Uri.parse(baseUrl));
+    final response = await http.get(Uri.parse('$_baseUrl/items'));
     if (response.statusCode == 200) {
-      final List<dynamic> itemsJson = json.decode(response.body);
-      return itemsJson.map((json) => Item.fromJson(json)).toList();
+      List jsonResponse = json.decode(response.body);
+      return jsonResponse.map((item) => Item.fromJson(item)).toList();
     } else {
       throw Exception('Failed to load items');
     }
@@ -18,8 +18,10 @@ class ItemService {
 
   Future<void> addItem(Item item) async {
     final response = await http.post(
-      Uri.parse(baseUrl),
-      headers: {'Content-Type': 'application/json'},
+      Uri.parse('$_baseUrl/items'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
       body: jsonEncode(item.toJson()),
     );
     if (response.statusCode != 201) {
@@ -29,8 +31,10 @@ class ItemService {
 
   Future<void> updateItem(String id, Item item) async {
     final response = await http.put(
-      Uri.parse('$baseUrl/$id'),
-      headers: {'Content-Type': 'application/json'},
+      Uri.parse('$_baseUrl/items/$id'),
+      headers: <String, String>{
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
       body: jsonEncode(item.toJson()),
     );
     if (response.statusCode != 200) {
@@ -39,9 +43,26 @@ class ItemService {
   }
 
   Future<void> deleteItem(String id) async {
-    final response = await http.delete(Uri.parse('$baseUrl/$id'));
+    final response = await http.delete(
+      Uri.parse('$_baseUrl/items/$id'),
+    );
     if (response.statusCode != 200) {
       throw Exception('Failed to delete item');
+    }
+  }
+
+  Future<String> uploadImage(File image) async {
+    final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/upload'));
+    request.files.add(await http.MultipartFile.fromPath('image', image.path));
+    final response = await request.send();
+
+    if (response.statusCode == 200) {
+      final responseData = await response.stream.bytesToString();
+      final jsonData = json.decode(responseData);
+      return jsonData['url'];
+    } else {
+      print(response.reasonPhrase);
+      throw Exception('Failed to upload image');
     }
   }
 }
